@@ -132,18 +132,20 @@ export function useRealtimeSync(gameId: string | null) {
     if (!gameId) return;
     const supabase = createClient();
 
-    const [gameRes, roundsRes, teamsRes, playersRes, membersRes] = await Promise.all([
-      supabase.from('games').select('*').eq('id', gameId).single(),
+    const [gameRes, roundsRes, teamsRes, membersRes, playersRes] = await Promise.all([
+      supabase.from('games').select('*').eq('id', gameId).limit(1),
       supabase.from('rounds').select('*').eq('game_id', gameId).order('round_number', { ascending: false }).limit(1),
       supabase.from('teams').select('*').eq('game_id', gameId),
-      supabase.from('players').select('*, team_members!inner(game_id)').eq('team_members.game_id', gameId),
       supabase.from('team_members').select('*').eq('game_id', gameId),
+      supabase.from('players').select('*').eq('game_id', gameId),
     ]);
 
-    if (gameRes.data) useGameStore.getState().setGame(gameRes.data as any);
-    if (roundsRes.data?.[0]) useGameStore.getState().setCurrentRound(roundsRes.data[0] as any);
-    if (teamsRes.data) useGameStore.getState().setTeams(teamsRes.data as any);
-    if (membersRes.data) useGameStore.getState().setTeamMembers(membersRes.data as any);
+    const store = useGameStore.getState();
+    if (gameRes.data?.[0]) store.setGame(gameRes.data[0] as any);
+    if (roundsRes.data?.[0]) store.setCurrentRound(roundsRes.data[0] as any);
+    if (teamsRes.data) store.setTeams(teamsRes.data as any);
+    if (membersRes.data) store.setTeamMembers(membersRes.data as any);
+    if (playersRes.data) store.setPlayers(playersRes.data as any);
   };
 
   return { fetchFullState };

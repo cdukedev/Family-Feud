@@ -29,6 +29,7 @@ export interface Player {
   auth_id: string;
   username: string;
   avatar_color: string | null;
+  game_id: string | null;
   created_at: string;
 }
 

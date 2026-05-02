@@ -65,6 +65,13 @@ export default function HostPage() {
         // Generate room code and create game
         const code = generateRoomCode();
         const newGame = await createGame(playerId, code);
+
+        // Associate host player with this game
+        await supabase
+          .from('players')
+          .update({ game_id: newGame.id })
+          .eq('id', playerId);
+
         setGameId(newGame.id);
         setRoomCode(newGame.room_code);
 

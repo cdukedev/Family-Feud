@@ -24,37 +24,31 @@ export function Lobby({ gameId, roomCode, hostId, onGameStart }: LobbyProps) {
   useEffect(() => {
     const supabase = createClient();
 
-    // Fetch initial players
+    // Fetch players who have joined THIS game
     async function fetchPlayers() {
-      const { data } = await supabase
-        .from('team_members')
-        .select('player_id')
+      const { data: gamePlayers } = await supabase
+        .from('players')
+        .select('*')
         .eq('game_id', gameId);
 
-      // For lobby, we track players who have the game context
-      // Initially, just fetch all players who have joined via the lobby
-      const { data: allPlayers } = await supabase
-        .from('players')
-        .select('*');
-
-      if (allPlayers) setPlayers(allPlayers as Player[]);
+      if (gamePlayers) setPlayers(gamePlayers as Player[]);
     }
     fetchPlayers();
 
-    // Listen for new players
+    // Listen for new players joining this game
     const channel = supabase
       .channel(`lobby:${gameId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'players',
+          filter: `game_id=eq.${gameId}`,
         },
-        (payload) => {
-          if (payload.new) {
-            useGameStore.getState().addPlayer(payload.new as Player);
-          }
+        () => {
+          // Refetch all game players on any change
+          fetchPlayers();
         },
       )
       .subscribe();

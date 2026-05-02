@@ -15,6 +15,7 @@ export type Database = {
           auth_id: string;
           username: string;
           avatar_color: string | null;
+          game_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -22,6 +23,7 @@ export type Database = {
           auth_id: string;
           username: string;
           avatar_color?: string | null;
+          game_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -29,6 +31,7 @@ export type Database = {
           auth_id?: string;
           username?: string;
           avatar_color?: string | null;
+          game_id?: string | null;
           created_at?: string;
         };
         Relationships: [];

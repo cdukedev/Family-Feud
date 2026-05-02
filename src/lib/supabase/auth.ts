@@ -14,7 +14,7 @@ export async function getSession() {
   return session;
 }
 
-export async function createPlayer(username: string, avatarColor: string) {
+export async function createPlayer(username: string, avatarColor: string, gameId?: string) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -25,6 +25,7 @@ export async function createPlayer(username: string, avatarColor: string) {
       auth_id: user.id,
       username,
       avatar_color: avatarColor,
+      ...(gameId ? { game_id: gameId } : {}),
     })
     .select()
     .single();
@@ -51,14 +52,21 @@ export async function joinGame(playerId: string, roomCode: string) {
   const supabase = createClient();
 
   // Find game by room code
-  const { data: game, error: gameError } = await supabase
+  const { data: games } = await supabase
     .from('games')
     .select('*')
     .eq('room_code', roomCode.toUpperCase())
     .eq('status', 'lobby')
-    .single();
+    .limit(1);
 
-  if (gameError || !game) throw new Error('Game not found or already started');
+  if (!games?.length) throw new Error('Game not found or already started');
+  const game = games[0];
+
+  // Associate player with this game
+  await supabase
+    .from('players')
+    .update({ game_id: game.id })
+    .eq('id', playerId);
 
   return game;
 }

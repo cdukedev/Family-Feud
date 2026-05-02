@@ -92,6 +92,27 @@ export function GameBoard({ gameId }: GameBoardProps) {
     return <FastMoneyBoard gameId={gameId} teams={teams} />;
   }
 
+  // Waiting for round to be created
+  if (!currentRound) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center bg-gradient-to-b from-[var(--color-dark)] via-[#0d1b2a] to-[var(--color-dark)] p-8">
+        <Logo size="lg" className="mb-8" />
+        <motion.p
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="text-white/60 text-2xl"
+        >
+          Starting the game...
+        </motion.p>
+        {teams.length >= 2 && (
+          <div className="mt-8">
+            <Scoreboard teams={teams} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const faceOffPlayers = getFaceOffPlayers();
 
   return (

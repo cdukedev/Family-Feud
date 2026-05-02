@@ -92,13 +92,34 @@ export default function HostPage() {
     if (!gameId) return;
     const supabase = createClient();
 
-    // Start the first round
-    await supabase
-      .from('games')
-      .update({ status: 'face_off', current_round: 1 })
-      .eq('id', gameId);
+    try {
+      // Call advance-round to create the first round with a question
+      const { error: fnError } = await supabase.functions.invoke('advance-round', {
+        body: {
+          game_id: gameId,
+          action: 'start_game',
+        },
+      });
 
-    setGameStarted(true);
+      if (fnError) {
+        // Fallback: just update game status directly
+        console.warn('Edge function not deployed, starting game directly:', fnError);
+        await supabase
+          .from('games')
+          .update({ status: 'face_off', current_round: 1 })
+          .eq('id', gameId);
+      }
+
+      setGameStarted(true);
+    } catch (err) {
+      console.error('Failed to start game:', err);
+      // Fallback: start directly
+      await supabase
+        .from('games')
+        .update({ status: 'face_off', current_round: 1 })
+        .eq('id', gameId);
+      setGameStarted(true);
+    }
   };
 
   if (loading) {

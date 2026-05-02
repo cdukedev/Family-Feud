@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useId } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/stores/gameStore';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export function useRealtimeSync(gameId: string | null) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const instanceId = useId();
   const {
     setGame,
     setCurrentRound,
@@ -26,10 +27,13 @@ export function useRealtimeSync(gameId: string | null) {
     // Clean up existing subscription
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
 
+    // Use unique channel name to avoid "already subscribed" conflicts
+    const channelName = `game:${gameId}:${instanceId}:${Date.now()}`;
     const channel = supabase
-      .channel(`game:${gameId}`)
+      .channel(channelName)
       // Game state changes
       .on(
         'postgres_changes',

@@ -35,7 +35,7 @@ export function Lobby({ gameId, roomCode, hostId, onGameStart }: LobbyProps) {
     }
     fetchPlayers();
 
-    // Listen for new players joining this game
+    // Listen for ANY player changes (filter can miss INSERT→UPDATE race)
     const channel = supabase
       .channel(`lobby:${gameId}`)
       .on(
@@ -44,17 +44,19 @@ export function Lobby({ gameId, roomCode, hostId, onGameStart }: LobbyProps) {
           event: '*',
           schema: 'public',
           table: 'players',
-          filter: `game_id=eq.${gameId}`,
         },
         () => {
-          // Refetch all game players on any change
           fetchPlayers();
         },
       )
       .subscribe();
 
+    // Poll every 3s as fallback (Realtime filter may miss UPDATE from null→gameId)
+    const poll = setInterval(fetchPlayers, 3000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(poll);
     };
   }, [gameId, setPlayers]);
 

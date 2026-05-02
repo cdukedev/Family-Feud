@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { createClient } from '@/lib/supabase/client';
+import { callApi } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface HostOverridePanelProps {
@@ -21,14 +21,11 @@ export function HostOverridePanel({
   if (!lastAnswerPlayerId || lastAnswerCorrect === null) return null;
 
   const handleOverride = async (action: 'accept' | 'reject') => {
-    const supabase = createClient();
-    await supabase.functions.invoke('advance-round', {
-      body: {
-        round_id: roundId,
-        action: 'host_override',
-        override_type: action,
-        player_id: lastAnswerPlayerId,
-      },
+    await callApi('advance-round', {
+      round_id: roundId,
+      action: 'host_override',
+      override_type: action,
+      player_id: lastAnswerPlayerId,
     });
     setShow(false);
   };

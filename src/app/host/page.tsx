@@ -90,36 +90,18 @@ export default function HostPage() {
 
   const handleGameStart = async () => {
     if (!gameId) return;
-    const supabase = createClient();
 
-    try {
-      // Call advance-round to create the first round with a question
-      const { error: fnError } = await supabase.functions.invoke('advance-round', {
-        body: {
-          game_id: gameId,
-          action: 'start_game',
-        },
-      });
+    const response = await fetch('/api/advance-round', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game_id: gameId, action: 'start_game' }),
+    });
 
-      if (fnError) {
-        // Fallback: just update game status directly
-        console.warn('Edge function not deployed, starting game directly:', fnError);
-        await supabase
-          .from('games')
-          .update({ status: 'face_off', current_round: 1 })
-          .eq('id', gameId);
-      }
-
-      setGameStarted(true);
-    } catch (err) {
-      console.error('Failed to start game:', err);
-      // Fallback: start directly
-      await supabase
-        .from('games')
-        .update({ status: 'face_off', current_round: 1 })
-        .eq('id', gameId);
-      setGameStarted(true);
+    if (!response.ok) {
+      console.error('Failed to start game:', await response.text());
     }
+
+    setGameStarted(true);
   };
 
   if (loading) {

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Timer } from '@/components/ui/Timer';
-import { createClient } from '@/lib/supabase/client';
+import { callApi } from '@/lib/api';
 import { motion } from 'framer-motion';
 
 interface AnswerScreenProps {
@@ -41,16 +41,13 @@ export function AnswerScreen({
 
     setSubmitting(true);
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase.functions.invoke('judge-answer', {
-        body: {
-          round_id: roundId,
-          question_id: questionId,
-          player_id: playerId,
-          team_id: teamId,
-          raw_text: text.trim(),
-          phase,
-        },
+      const { data, error } = await callApi('judge-answer', {
+        round_id: roundId,
+        question_id: questionId,
+        player_id: playerId,
+        team_id: teamId,
+        raw_text: text.trim(),
+        phase,
       });
 
       if (error) throw error;

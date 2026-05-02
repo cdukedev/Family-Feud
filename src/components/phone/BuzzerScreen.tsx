@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/Button';
 import { useGameStore } from '@/stores/gameStore';
-import { createClient } from '@/lib/supabase/client';
+import { callApi } from '@/lib/api';
 import { motion } from 'framer-motion';
 
 interface BuzzerScreenProps {
@@ -17,15 +17,12 @@ export function BuzzerScreen({ roundId, playerId, teamId }: BuzzerScreenProps) {
   const handleBuzz = async () => {
     if (!buzzerArmed) return;
 
-    const supabase = createClient();
     try {
-      await supabase.functions.invoke('handle-buzz', {
-        body: {
-          round_id: roundId,
-          player_id: playerId,
-          team_id: teamId,
-          client_ts: Date.now(),
-        },
+      await callApi('handle-buzz', {
+        round_id: roundId,
+        player_id: playerId,
+        team_id: teamId,
+        client_ts: Date.now(),
       });
     } catch (err) {
       console.error('Buzz failed:', err);

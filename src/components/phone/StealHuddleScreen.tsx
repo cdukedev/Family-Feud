@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Timer } from '@/components/ui/Timer';
 import { useGameStore } from '@/stores/gameStore';
 import { createClient } from '@/lib/supabase/client';
+import { callApi } from '@/lib/api';
 import { motion } from 'framer-motion';
 
 interface StealHuddleScreenProps {
@@ -61,16 +62,13 @@ export function StealHuddleScreen({
     if (!stealAnswer.trim() || submitted) return;
     setSubmitted(true);
 
-    const supabase = createClient();
-    await supabase.functions.invoke('judge-answer', {
-      body: {
-        round_id: roundId,
-        question_id: questionId,
-        player_id: playerId,
-        team_id: teamId,
-        raw_text: stealAnswer.trim(),
-        phase: 'steal',
-      },
+    await callApi('judge-answer', {
+      round_id: roundId,
+      question_id: questionId,
+      player_id: playerId,
+      team_id: teamId,
+      raw_text: stealAnswer.trim(),
+      phase: 'steal',
     });
   };
 

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Timer } from '@/components/ui/Timer';
 import { useGameStore } from '@/stores/gameStore';
-import { createClient } from '@/lib/supabase/client';
+import { callApi } from '@/lib/api';
 import { motion } from 'framer-motion';
 
 interface FastMoneyScreenProps {
@@ -27,19 +27,16 @@ export function FastMoneyScreen({ playerId, isPlayer1 }: FastMoneyScreenProps) {
     setSubmitting(true);
 
     try {
-      const supabase = createClient();
-      await supabase.functions.invoke('judge-answer', {
-        body: {
-          round_id: null,
-          question_id: fastMoney.questions[currentQuestionIndex],
-          player_id: playerId,
-          team_id: null,
-          raw_text: answer.trim(),
-          phase: 'fast_money',
-          fast_money_id: fastMoney.id,
-          question_index: currentQuestionIndex,
-          is_player1: isPlayer1,
-        },
+      await callApi('judge-answer', {
+        round_id: null,
+        question_id: fastMoney.questions[currentQuestionIndex],
+        player_id: playerId,
+        team_id: null,
+        raw_text: answer.trim(),
+        phase: 'fast_money',
+        fast_money_id: fastMoney.id,
+        question_index: currentQuestionIndex,
+        is_player1: isPlayer1,
       });
 
       setAnswer('');

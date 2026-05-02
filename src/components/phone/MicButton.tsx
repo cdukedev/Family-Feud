@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AudioRecorder } from '@/lib/audio/recorder';
-import { createClient } from '@/lib/supabase/client';
 
 interface MicButtonProps {
   onTranscript: (text: string) => void;
@@ -39,16 +38,17 @@ export function MicButton({ onTranscript, disabled, className = '' }: MicButtonP
 
       const audioBlob = await recorderRef.current.stop();
 
-      // Send to STT edge function
+      // Send to STT API route
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
 
-      const supabase = createClient();
-      const { data, error } = await supabase.functions.invoke('stt-transcribe', {
+      const response = await fetch('/api/stt-transcribe', {
+        method: 'POST',
         body: formData,
       });
 
-      if (error) throw error;
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
       if (data?.transcript) {
         onTranscript(data.transcript);
       }

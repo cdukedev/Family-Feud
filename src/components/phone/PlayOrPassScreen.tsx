@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { createClient } from '@/lib/supabase/client';
+import { callApi } from '@/lib/api';
 import { motion } from 'framer-motion';
 
 interface PlayOrPassScreenProps {
@@ -20,15 +20,12 @@ export function PlayOrPassScreen({
   opponentTeamName,
 }: PlayOrPassScreenProps) {
   const handleChoice = async (choice: 'play' | 'pass') => {
-    const supabase = createClient();
     const controllingTeam = choice === 'play' ? playerTeamId : opponentTeamId;
 
-    await supabase.functions.invoke('advance-round', {
-      body: {
-        round_id: roundId,
-        action: 'play_or_pass',
-        controlling_team: controllingTeam,
-      },
+    await callApi('advance-round', {
+      round_id: roundId,
+      action: 'play_or_pass',
+      controlling_team: controllingTeam,
     });
   };
 

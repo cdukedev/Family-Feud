@@ -149,6 +149,30 @@ export async function POST(request: Request) {
 
     // --- After matching ---
 
+    // Fast Money Player 2 duplicate check — compare against Player 1's answers
+    if (fast_money_id && is_player1 === false && matchedAnswer) {
+      const { data: fmCheck } = await supabase
+        .from('fast_money')
+        .select('player1_answers')
+        .eq('id', fast_money_id)
+        .limit(1);
+
+      const p1Answers = (fmCheck?.[0]?.player1_answers as any[]) || [];
+      // Check if Player 1 matched the same answer for this question
+      if (question_index !== undefined) {
+        const p1Answer = p1Answers[question_index];
+        if (p1Answer && p1Answer.matched_rank === matchedAnswer.rank) {
+          return NextResponse.json({
+            is_correct: false,
+            is_duplicate_of_player1: true,
+            message: 'Try again!',
+          });
+          // Note: NO strike, NO player_answers record — just "Try again!"
+          // The player gets to answer again within their time limit
+        }
+      }
+    }
+
     // Check if matched answer is already revealed (duplicate)
     if (matchedAnswer && revealed.includes(matchedAnswer.rank)) {
       // Record the duplicate attempt as incorrect

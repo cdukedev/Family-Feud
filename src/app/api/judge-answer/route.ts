@@ -151,10 +151,36 @@ export async function POST(request: Request) {
 
     // Check if matched answer is already revealed (duplicate)
     if (matchedAnswer && revealed.includes(matchedAnswer.rank)) {
+      // Record the duplicate attempt as incorrect
+      await supabase.from('player_answers').insert({
+        round_id,
+        player_id,
+        team_id,
+        raw_text,
+        matched_rank: matchedAnswer.rank,
+        is_correct: false,
+        phase,
+      });
+
+      // Duplicates count as strikes in regular rounds (not fast_money)
+      if (round_id && !fast_money_id) {
+        const { data: roundData } = await supabase
+          .from('rounds')
+          .select('strikes')
+          .eq('id', round_id)
+          .limit(1);
+
+        const currentStrikes = roundData?.[0]?.strikes ?? 0;
+        await supabase
+          .from('rounds')
+          .update({ strikes: currentStrikes + 1 })
+          .eq('id', round_id);
+      }
+
       return NextResponse.json({
         is_correct: false,
         is_duplicate: true,
-        message: 'Already on the board',
+        message: 'Already on the board — counts as a strike!',
       });
     }
 

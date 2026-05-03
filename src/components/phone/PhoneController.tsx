@@ -74,13 +74,23 @@ export function PhoneController({ playerId, gameId }: PhoneControllerProps) {
       const isFaceOffPlayer = playerId === faceOffPlayer1 || playerId === faceOffPlayer2;
 
       if (isFaceOffPlayer) {
-        if (currentRound.face_off_winner) {
-          if (currentRound.face_off_winner === playerId) {
-            return 'play_or_pass';
+        if (!currentRound.face_off_winner) {
+          // Check if this player has already answered
+          const isFirstSlot = currentRound.face_off_answer1_player === playerId;
+          const isSecondSlot = currentRound.face_off_answer2_player === playerId;
+          const hasAnswered = isFirstSlot || isSecondSlot;
+
+          if (hasAnswered) {
+            return 'face_off_waiting'; // Answered, waiting for other player
           }
-          return 'face_off_answer'; // Second player answers
+          // Check if player has buzzed (via buzzer events tracked in state)
+          // If no buzzer events yet, show buzzer; otherwise show answer screen
+          return buzzerArmed ? 'face_off_buzzer' : 'face_off_answer';
         }
-        return 'face_off_buzzer';
+        if (currentRound.face_off_winner === playerId) {
+          return 'play_or_pass';
+        }
+        return 'waiting_for_teammate';
       }
       return 'face_off_waiting';
     }
@@ -103,7 +113,7 @@ export function PhoneController({ playerId, gameId }: PhoneControllerProps) {
     }
 
     return 'waiting_for_teammate';
-  }, [game, currentRound, teams, fastMoney, playerId, currentTurnPlayerId, playerTeam]);
+  }, [game, currentRound, teams, fastMoney, playerId, currentTurnPlayerId, playerTeam, buzzerArmed]);
 
   const isHost = game?.host_player === playerId;
 

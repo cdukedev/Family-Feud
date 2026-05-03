@@ -8,21 +8,26 @@ export async function POST(request: Request) {
     const supabase = createAdminClient();
     const serverTs = new Date().toISOString();
 
-    // Check if a winner already exists for this round
-    const { data: existing, error: fetchError } = await supabase
+    // Check how many buzzer events already exist for this round
+    const { data: existingBuzzes, error: fetchError } = await supabase
       .from('buzzer_events')
       .select('*')
       .eq('round_id', round_id)
-      .eq('is_winner', true)
-      .limit(1)
-      .maybeSingle();
+      .order('buzzed_at');
 
     if (fetchError) {
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
-    if (!existing) {
-      // This player is the winner
+    const buzzCount = existingBuzzes?.length || 0;
+
+    // Prevent duplicate buzzes from the same player
+    if (existingBuzzes?.some((b) => b.player_id === player_id)) {
+      return NextResponse.json({ status: 'already_buzzed' });
+    }
+
+    if (buzzCount === 0) {
+      // First buzzer — record but do NOT set face_off_winner
       const { error: insertError } = await supabase
         .from('buzzer_events')
         .insert({
@@ -31,20 +36,14 @@ export async function POST(request: Request) {
           team_id,
           client_ts,
           buzzed_at: serverTs,
-          is_winner: true,
+          is_winner: false, // Winner not yet determined
         });
 
       if (insertError) {
         return NextResponse.json({ error: insertError.message }, { status: 500 });
       }
 
-      // Update the round's face_off_winner
-      await supabase
-        .from('rounds')
-        .update({ face_off_winner: player_id })
-        .eq('id', round_id);
-
-      // Broadcast buzzer_winner event to the game's Realtime channel
+      // Broadcast buzzer event for UI updates
       const { data: roundData } = await supabase
         .from('rounds')
         .select('game_id')
@@ -56,16 +55,16 @@ export async function POST(request: Request) {
         await supabase.channel(`game:${round.game_id}`).send({
           type: 'broadcast',
           event: 'buzzer_winner',
-          payload: { player_id, team_id, round_id, server_ts: serverTs },
+          payload: { player_id, team_id, round_id, server_ts: serverTs, answer_order: 1 },
         });
       }
 
       return NextResponse.json({
-        status: 'winner',
-        answer_window_seconds: 10,
+        status: 'first_buzzer',
+        answer_order: 1,
       });
     } else {
-      // Winner already exists — this player is second
+      // Second buzzer — record but do NOT set face_off_winner
       const { error: insertError } = await supabase
         .from('buzzer_events')
         .insert({
@@ -74,16 +73,32 @@ export async function POST(request: Request) {
           team_id,
           client_ts,
           buzzed_at: serverTs,
-          is_winner: false,
+          is_winner: false, // Winner not yet determined
         });
 
       if (insertError) {
         return NextResponse.json({ error: insertError.message }, { status: 500 });
       }
 
+      // Broadcast second buzzer event for UI updates
+      const { data: roundData } = await supabase
+        .from('rounds')
+        .select('game_id')
+        .eq('id', round_id)
+        .limit(1);
+
+      const round = roundData?.[0];
+      if (round) {
+        await supabase.channel(`game:${round.game_id}`).send({
+          type: 'broadcast',
+          event: 'buzzer_winner',
+          payload: { player_id, team_id, round_id, server_ts: serverTs, answer_order: 2 },
+        });
+      }
+
       return NextResponse.json({
-        status: 'second',
-        winner: existing.player_id,
+        status: 'second_buzzer',
+        answer_order: 2,
       });
     }
   } catch (err: unknown) {

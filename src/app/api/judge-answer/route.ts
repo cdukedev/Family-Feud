@@ -169,6 +169,178 @@ Respond with ONLY the exact board answer text that matches, or "NO MATCH".`;
 
     // --- After matching ---
 
+    // --- Face-off answer comparison ---
+    if (phase === 'face_off' && round_id) {
+      const { data: roundForFaceOff } = await supabase
+        .from('rounds')
+        .select('face_off_answer1_rank, face_off_answer1_player, face_off_answer2_rank, face_off_answer2_player, face_off_pair_index, game_id')
+        .eq('id', round_id)
+        .limit(1);
+
+      const faceOffRound = roundForFaceOff?.[0];
+      if (faceOffRound) {
+        const thisRank = matchedAnswer ? matchedAnswer.rank : null;
+
+        if (!faceOffRound.face_off_answer1_player) {
+          // First face-off answer — store it and wait for second
+          await supabase
+            .from('rounds')
+            .update({
+              face_off_answer1_rank: thisRank,
+              face_off_answer1_player: player_id,
+            })
+            .eq('id', round_id);
+
+          // Record the player_answer
+          await supabase.from('player_answers').insert({
+            round_id,
+            player_id,
+            team_id,
+            raw_text,
+            matched_rank: thisRank,
+            is_correct: !!matchedAnswer,
+            phase,
+          });
+
+          // If matched, reveal on the board
+          if (matchedAnswer && round_id) {
+            const { data: revData } = await supabase
+              .from('rounds')
+              .select('revealed')
+              .eq('id', round_id)
+              .limit(1);
+            const currentRevealed = revData?.[0]?.revealed || [];
+            if (!currentRevealed.includes(matchedAnswer.rank)) {
+              await supabase
+                .from('rounds')
+                .update({ revealed: [...currentRevealed, matchedAnswer.rank] })
+                .eq('id', round_id);
+            }
+          }
+
+          return NextResponse.json({
+            is_correct: !!matchedAnswer,
+            matched_rank: thisRank,
+            matched_text: matchedAnswer?.text || null,
+            points: matchedAnswer?.points || 0,
+            face_off_result: 'pending',
+          });
+        } else if (!faceOffRound.face_off_answer2_player) {
+          // Second face-off answer — store, then compare
+          await supabase
+            .from('rounds')
+            .update({
+              face_off_answer2_rank: thisRank,
+              face_off_answer2_player: player_id,
+            })
+            .eq('id', round_id);
+
+          // Record the player_answer
+          await supabase.from('player_answers').insert({
+            round_id,
+            player_id,
+            team_id,
+            raw_text,
+            matched_rank: thisRank,
+            is_correct: !!matchedAnswer,
+            phase,
+          });
+
+          // If matched, reveal on the board
+          if (matchedAnswer && round_id) {
+            const { data: revData } = await supabase
+              .from('rounds')
+              .select('revealed')
+              .eq('id', round_id)
+              .limit(1);
+            const currentRevealed = revData?.[0]?.revealed || [];
+            if (!currentRevealed.includes(matchedAnswer.rank)) {
+              await supabase
+                .from('rounds')
+                .update({ revealed: [...currentRevealed, matchedAnswer.rank] })
+                .eq('id', round_id);
+            }
+          }
+
+          // Now compare both answers
+          const rank1 = faceOffRound.face_off_answer1_rank;
+          const player1 = faceOffRound.face_off_answer1_player;
+          const rank2 = thisRank;
+          const player2 = player_id;
+
+          const p1OnBoard = rank1 !== null && rank1 !== undefined;
+          const p2OnBoard = rank2 !== null && rank2 !== undefined;
+
+          if (p1OnBoard && p2OnBoard) {
+            // Both on board: lower rank number wins (rank 1 beats rank 2, etc.)
+            const winner = rank1! <= rank2! ? player1 : player2;
+            await supabase
+              .from('rounds')
+              .update({ face_off_winner: winner })
+              .eq('id', round_id);
+
+            return NextResponse.json({
+              is_correct: !!matchedAnswer,
+              matched_rank: thisRank,
+              matched_text: matchedAnswer?.text || null,
+              points: matchedAnswer?.points || 0,
+              face_off_result: winner === player_id ? 'winner' : 'loser',
+              face_off_winner: winner,
+            });
+          } else if (p1OnBoard && !p2OnBoard) {
+            // Only player 1 on board — player 1 wins
+            await supabase
+              .from('rounds')
+              .update({ face_off_winner: player1 })
+              .eq('id', round_id);
+
+            return NextResponse.json({
+              is_correct: !!matchedAnswer,
+              matched_rank: thisRank,
+              matched_text: matchedAnswer?.text || null,
+              points: matchedAnswer?.points || 0,
+              face_off_result: 'loser',
+              face_off_winner: player1,
+            });
+          } else if (!p1OnBoard && p2OnBoard) {
+            // Only player 2 on board — player 2 wins
+            await supabase
+              .from('rounds')
+              .update({ face_off_winner: player2 })
+              .eq('id', round_id);
+
+            return NextResponse.json({
+              is_correct: !!matchedAnswer,
+              matched_rank: thisRank,
+              matched_text: matchedAnswer?.text || null,
+              points: matchedAnswer?.points || 0,
+              face_off_result: 'winner',
+              face_off_winner: player2,
+            });
+          } else {
+            // Neither on board — increment pair index, clear answer fields
+            const newPairIndex = (faceOffRound.face_off_pair_index ?? 0) + 1;
+            await supabase
+              .from('rounds')
+              .update({
+                face_off_pair_index: newPairIndex,
+                face_off_answer1_rank: null,
+                face_off_answer1_player: null,
+                face_off_answer2_rank: null,
+                face_off_answer2_player: null,
+              })
+              .eq('id', round_id);
+
+            return NextResponse.json({
+              is_correct: false,
+              face_off_result: 'neither',
+              message: 'Neither answer on the board — next pair!',
+            });
+          }
+        }
+      }
+    }
+
     // Fast Money Player 2 duplicate check — compare against Player 1's answers
     if (fast_money_id && is_player1 === false && matchedAnswer) {
       const { data: fmCheck } = await supabase

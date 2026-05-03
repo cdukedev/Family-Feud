@@ -100,6 +100,11 @@ export interface Round {
   strikes: number;
   revealed: number[];
   face_off_winner: string | null;
+  face_off_answer1_rank: number | null;
+  face_off_answer1_player: string | null;
+  face_off_answer2_rank: number | null;
+  face_off_answer2_player: string | null;
+  face_off_pair_index: number;
   created_at: string;
 }
 

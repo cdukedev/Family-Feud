@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 const HOST_PERSONALITY = `You are the host of Family Feud. You are enthusiastic, quick-witted, and love dramatic pauses. You call players by their actual usernames. You react with excitement to correct answers ("Good answer! Good answer!"), sympathy to strikes ("Ohhh, that's a strike!"), and build suspense during reveals. Keep responses short and punchy — 1-3 sentences max. Return ONLY dialogue text, no stage directions.`;
 
 export async function POST(request: Request) {
   try {
-    const { event_type, context } = await request.json();
+    const { game_id, event_type, context } = await request.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -24,6 +25,24 @@ export async function POST(request: Request) {
         event_type,
       });
     }
+
+    const supabase = createAdminClient();
+
+    // Fetch recent memories for context
+    let memoryContext = '';
+    if (game_id) {
+      const { data: memories } = await supabase
+        .from('host_memory')
+        .select('event_type, dialogue')
+        .eq('game_id', game_id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      memoryContext = memories?.map(m => `[${m.event_type}]: ${m.dialogue}`).join('\n') || '';
+    }
+
+    const enrichedPrompt = HOST_PERSONALITY +
+      (memoryContext ? `\n\nRecent game events (reference these for callbacks):\n${memoryContext}` : '');
 
     let userPrompt = '';
     switch (event_type) {
@@ -59,7 +78,7 @@ export async function POST(request: Request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          systemInstruction: { parts: [{ text: HOST_PERSONALITY }] },
+          systemInstruction: { parts: [{ text: enrichedPrompt }] },
           generationConfig: { temperature: 0.8, maxOutputTokens: 256 },
         }),
       },
@@ -72,6 +91,15 @@ export async function POST(request: Request) {
 
     const geminiData = await geminiResponse.json();
     const dialogue = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Store dialogue in host memory for future callbacks
+    if (game_id) {
+      try {
+        await supabase.from('host_memory').insert({
+          game_id, event_type, dialogue, context,
+        });
+      } catch { /* Don't fail if memory insert fails */ }
+    }
 
     return NextResponse.json({ dialogue, event_type });
   } catch (err: any) {

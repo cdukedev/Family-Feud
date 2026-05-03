@@ -195,6 +195,11 @@ export type Database = {
           strikes: number;
           revealed: number[];
           face_off_winner: string | null;
+          face_off_answer1_rank: number | null;
+          face_off_answer1_player: string | null;
+          face_off_answer2_rank: number | null;
+          face_off_answer2_player: string | null;
+          face_off_pair_index: number;
           created_at: string;
         };
         Insert: {
@@ -208,6 +213,11 @@ export type Database = {
           strikes?: number;
           revealed?: number[];
           face_off_winner?: string | null;
+          face_off_answer1_rank?: number | null;
+          face_off_answer1_player?: string | null;
+          face_off_answer2_rank?: number | null;
+          face_off_answer2_player?: string | null;
+          face_off_pair_index?: number;
           created_at?: string;
         };
         Update: {
@@ -221,6 +231,11 @@ export type Database = {
           strikes?: number;
           revealed?: number[];
           face_off_winner?: string | null;
+          face_off_answer1_rank?: number | null;
+          face_off_answer1_player?: string | null;
+          face_off_answer2_rank?: number | null;
+          face_off_answer2_player?: string | null;
+          face_off_pair_index?: number;
           created_at?: string;
         };
         Relationships: [];
@@ -308,6 +323,33 @@ export type Database = {
           player2_total?: number;
           combined_total?: number;
           status?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      host_memory: {
+        Row: {
+          id: string;
+          game_id: string;
+          event_type: string;
+          dialogue: string;
+          context: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          game_id: string;
+          event_type: string;
+          dialogue: string;
+          context?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          game_id?: string;
+          event_type?: string;
+          dialogue?: string;
+          context?: Json;
           created_at?: string;
         };
         Relationships: [];

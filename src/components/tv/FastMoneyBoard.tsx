@@ -22,6 +22,25 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
   const [showConfetti, setShowConfetti] = useState(false);
   const celebratedRef = useRef(false);
 
+  // Sequential reveal — advance every 4 seconds when revealing
+  useEffect(() => {
+    if (fastMoney?.status !== 'reveal') return;
+
+    setRevealIndex(0); // Start with first answer
+
+    const interval = setInterval(() => {
+      setRevealIndex(prev => {
+        const next = prev + 1;
+        if (next >= 10) { // 5 questions × 2 players = 10 reveals
+          clearInterval(interval);
+        }
+        return next;
+      });
+    }, 4000); // 4 seconds per reveal
+
+    return () => clearInterval(interval);
+  }, [fastMoney?.status]);
+
   useEffect(() => {
     if (fastMoney && fastMoney.combined_total >= 200 && !celebratedRef.current) {
       celebratedRef.current = true;
@@ -73,8 +92,8 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
         {fastMoney.questions.map((_, idx) => {
           const p1 = p1Answers[idx];
           const p2 = p2Answers[idx];
-          const p1Revealed = isRevealing || isComplete;
-          const p2Revealed = isRevealing || isComplete;
+          const showP1 = isComplete || (isRevealing && revealIndex >= idx * 2);
+          const showP2 = isComplete || (isRevealing && revealIndex >= idx * 2 + 1);
 
           return (
             <div
@@ -85,11 +104,17 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
 
               {/* Player 1 answer */}
               <div className="bg-white/5 rounded-lg px-4 py-3 text-center">
-                {p1 ? (
+                {p1 && showP1 ? (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-white font-medium uppercase"
+                  >
+                    {p1.raw_text}
+                  </motion.span>
+                ) : p1 && !isRevealing && !isComplete ? (
                   <span className="text-white font-medium uppercase">
-                    {fastMoney.status === 'player1_playing' && !isRevealing
-                      ? 'LOCKED'
-                      : p1.raw_text}
+                    {fastMoney.status === 'player1_playing' ? 'LOCKED' : p1.raw_text}
                   </span>
                 ) : (
                   <span className="text-white/20">---</span>
@@ -98,7 +123,7 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
 
               {/* Player 1 points */}
               <div className="text-center">
-                {p1 && p1Revealed ? (
+                {p1 && showP1 ? (
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -113,11 +138,17 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
 
               {/* Player 2 answer */}
               <div className="bg-white/5 rounded-lg px-4 py-3 text-center">
-                {p2 ? (
+                {p2 && showP2 ? (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-white font-medium uppercase"
+                  >
+                    {p2.raw_text}
+                  </motion.span>
+                ) : p2 && !isRevealing && !isComplete ? (
                   <span className="text-white font-medium uppercase">
-                    {fastMoney.status === 'player2_playing' && !isRevealing
-                      ? 'LOCKED'
-                      : p2.raw_text}
+                    {fastMoney.status === 'player2_playing' ? 'LOCKED' : p2.raw_text}
                   </span>
                 ) : (
                   <span className="text-white/20">---</span>
@@ -126,7 +157,7 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
 
               {/* Player 2 points */}
               <div className="text-center">
-                {p2 && p2Revealed ? (
+                {p2 && showP2 ? (
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
@@ -146,18 +177,31 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
       {/* Running total */}
       <div className="mt-6 text-center">
         <p className="text-white/60 text-sm uppercase tracking-wider mb-1">Total</p>
-        <motion.p
-          key={fastMoney.combined_total}
-          initial={{ scale: 1.2 }}
-          animate={{ scale: 1 }}
-          className={`text-5xl md:text-7xl font-black ${
-            fastMoney.combined_total >= 200
-              ? 'text-[var(--color-gold)] drop-shadow-[0_0_30px_rgba(255,215,0,0.6)]'
-              : 'text-white'
-          }`}
-        >
-          {fastMoney.combined_total}
-        </motion.p>
+        {(() => {
+          let visibleTotal = fastMoney.combined_total;
+          if (isRevealing && !isComplete) {
+            visibleTotal = 0;
+            for (let i = 0; i < 5; i++) {
+              if (revealIndex >= i * 2 && p1Answers[i]) visibleTotal += p1Answers[i].points || 0;
+              if (revealIndex >= i * 2 + 1 && p2Answers[i]) visibleTotal += p2Answers[i].points || 0;
+            }
+          }
+          return (
+            <motion.p
+              key={visibleTotal}
+              initial={{ scale: 1.2 }}
+              animate={{ scale: 1 }}
+              className={`text-5xl md:text-7xl font-black ${
+                visibleTotal >= 200
+                  ? 'text-[var(--color-gold)] drop-shadow-[0_0_30px_rgba(255,215,0,0.6)]'
+                  : 'text-white'
+              }`}
+            >
+              {visibleTotal}
+            </motion.p>
+          );
+        })()}
+
         <p className="text-white/40 text-sm mt-1">/ 200 points to win</p>
       </div>
 

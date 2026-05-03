@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { Team } from '@/types/game';
 
 interface ScoreboardProps {
@@ -51,30 +51,39 @@ export function Scoreboard({ teams, roundPoints, controllingTeamId }: Scoreboard
   return (
     <div className="flex items-stretch justify-between gap-4 w-full max-w-4xl mx-auto">
       {teams.map((team, idx) => (
-        <motion.div
-          key={team.id}
-          className={`
-            flex-1 flex flex-col items-center p-4 md:p-6 rounded-2xl
-            ${team.id === controllingTeamId ? 'ring-2 ring-[var(--color-gold)] shadow-[0_0_20px_rgba(255,215,0,0.2)]' : ''}
-          `}
-          style={{
-            backgroundColor: team.color + '20',
-            borderLeft: idx === 0 ? `4px solid ${team.color}` : undefined,
-            borderRight: idx === 1 ? `4px solid ${team.color}` : undefined,
-          }}
-        >
-          <p className="text-sm md:text-base font-medium text-white/70 uppercase tracking-wider mb-1">
-            {team.name}
-          </p>
-          <p className="text-4xl md:text-6xl font-black text-white">
-            <AnimatedScore score={team.score} />
-          </p>
-          {team.id === controllingTeamId && roundPoints !== undefined && roundPoints > 0 && (
-            <p className="text-sm text-[var(--color-gold)] mt-1">
-              +{roundPoints} this round
+        <React.Fragment key={team.id}>
+          <motion.div
+            className={`
+              flex-1 flex flex-col items-center p-4 md:p-6 rounded-2xl
+              ${team.id === controllingTeamId ? 'ring-2 ring-[var(--color-gold)] shadow-[0_0_20px_rgba(255,215,0,0.2)]' : ''}
+            `}
+            style={{
+              backgroundColor: team.color + '20',
+              borderLeft: idx === 0 ? `4px solid ${team.color}` : undefined,
+              borderRight: idx === 1 ? `4px solid ${team.color}` : undefined,
+            }}
+          >
+            <p className="text-sm md:text-base font-medium text-white/70 uppercase tracking-wider mb-1">
+              {team.name}
             </p>
+            <p className="text-4xl md:text-6xl font-black text-white">
+              <AnimatedScore score={team.score} />
+            </p>
+          </motion.div>
+          {idx === 0 && roundPoints !== undefined && roundPoints > 0 && (
+            <div className="flex flex-col items-center px-4">
+              <p className="text-white/40 text-[10px] uppercase tracking-wider">Round Pot</p>
+              <motion.p
+                key={roundPoints}
+                initial={{ scale: 1.3 }}
+                animate={{ scale: 1 }}
+                className="text-[var(--color-gold)] text-3xl md:text-4xl font-black"
+              >
+                {roundPoints}
+              </motion.p>
+            </div>
           )}
-        </motion.div>
+        </React.Fragment>
       ))}
     </div>
   );

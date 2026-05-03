@@ -16,6 +16,8 @@ export async function POST(request: Request) {
       controlling_team,
       override_type,
       player_id,
+      steal_success,
+      stealing_team_id,
     } = await request.json();
 
     const supabase = createAdminClient();
@@ -330,6 +332,64 @@ export async function POST(request: Request) {
           success: true,
           override_type,
           player_id,
+        });
+      }
+
+      // ─── COMPLETE STEAL ─────────────────────────────────────────
+      case 'complete_steal': {
+        if (!round_id) {
+          return NextResponse.json({ error: 'round_id required' }, { status: 400 });
+        }
+
+        // Fetch round
+        const { data: stealRound } = await supabase
+          .from('rounds')
+          .select('game_id, question_id, revealed, point_multiplier, controlling_team')
+          .eq('id', round_id)
+          .limit(1);
+
+        const sr = stealRound?.[0];
+        if (!sr) {
+          return NextResponse.json({ error: 'Round not found' }, { status: 404 });
+        }
+
+        // Calculate total points from revealed answers
+        const { data: stealAnswers } = await supabase
+          .from('answers')
+          .select('rank, points')
+          .eq('question_id', sr.question_id);
+
+        const stealPoints = (stealAnswers || [])
+          .filter((a) => ((sr.revealed as number[]) || []).includes(a.rank))
+          .reduce((sum, a) => sum + a.points * (sr.point_multiplier || 1), 0);
+
+        // Award to correct team
+        const winnerTeamId = steal_success ? stealing_team_id : sr.controlling_team;
+
+        if (winnerTeamId && stealPoints > 0) {
+          const { data: teamData } = await supabase
+            .from('teams')
+            .select('score')
+            .eq('id', winnerTeamId)
+            .limit(1);
+
+          await supabase
+            .from('teams')
+            .update({ score: (teamData?.[0]?.score ?? 0) + stealPoints })
+            .eq('id', winnerTeamId);
+        }
+
+        // Mark round complete
+        await supabase
+          .from('rounds')
+          .update({ phase: 'complete' })
+          .eq('id', round_id);
+
+        return NextResponse.json({
+          status: 'steal_resolved',
+          steal_success,
+          points_awarded: stealPoints,
+          awarded_to: winnerTeamId,
         });
       }
 

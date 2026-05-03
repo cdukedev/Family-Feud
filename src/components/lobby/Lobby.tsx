@@ -12,11 +12,11 @@ import type { Player } from '@/types/game';
 interface LobbyProps {
   gameId: string;
   roomCode: string;
-  hostId: string;
+  hostId?: string | null;
   onGameStart: () => void;
 }
 
-export function Lobby({ gameId, roomCode, hostId, onGameStart }: LobbyProps) {
+export function Lobby({ gameId, roomCode, hostId = null, onGameStart }: LobbyProps) {
   const [phase, setPhase] = useState<'waiting' | 'teams'>('waiting');
   const { players, setPlayers } = useGameStore();
 
@@ -89,7 +89,7 @@ export function Lobby({ gameId, roomCode, hostId, onGameStart }: LobbyProps) {
         </div>
 
         <div className="flex-1 w-full max-w-sm">
-          <PlayerList players={players} hostId={hostId} />
+          <PlayerList players={players} hostId={hostId ?? undefined} />
 
           {players.length >= 2 && (
             <button

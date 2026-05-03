@@ -3,19 +3,15 @@
 import { useState, useEffect } from 'react';
 import { Lobby } from '@/components/lobby/Lobby';
 import { GameBoard } from '@/components/tv/GameBoard';
-import { usePlayer } from '@/hooks/usePlayer';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { useGameStore } from '@/stores/gameStore';
-import { createGame } from '@/lib/supabase/auth';
+import { createGame, signInAnonymously } from '@/lib/supabase/auth';
 import { generateRoomCode } from '@/lib/game/room-code';
 import { createClient } from '@/lib/supabase/client';
-import { signInAnonymously } from '@/lib/supabase/auth';
-import { getAvatarColor } from '@/lib/game/room-code';
 
 export default function HostPage() {
   const [gameId, setGameId] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState<string>('');
-  const [hostId, setHostId] = useState<string>('');
   const [gameStarted, setGameStarted] = useState(false);
   const [loading, setLoading] = useState(true);
   const { game } = useGameStore();
@@ -29,7 +25,7 @@ export default function HostPage() {
       try {
         const supabase = createClient();
 
-        // Sign in anonymously
+        // Sign in anonymously (for Supabase auth)
         let { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           await signInAnonymously();
@@ -37,47 +33,15 @@ export default function HostPage() {
           session = res.data.session;
         }
 
-        // Create host player
-        const { data: existingPlayers } = await supabase
-          .from('players')
-          .select('*')
-          .eq('auth_id', session!.user.id)
-          .limit(1);
-
-        let playerId: string;
-        if (existingPlayers && existingPlayers.length > 0) {
-          playerId = existingPlayers[0].id;
-        } else {
-          const { data: newPlayers, error } = await supabase
-            .from('players')
-            .insert({
-              auth_id: session!.user.id,
-              username: 'Host',
-              avatar_color: getAvatarColor(0),
-            })
-            .select();
-          if (error || !newPlayers?.length) throw error || new Error('Failed to create player');
-          playerId = newPlayers[0].id;
-        }
-
-        setHostId(playerId);
-
-        // Generate room code and create game
+        // Generate room code and create game using auth uid as host_player
         const code = generateRoomCode();
-        const newGame = await createGame(playerId, code);
-
-        // Associate host player with this game
-        await supabase
-          .from('players')
-          .update({ game_id: newGame.id })
-          .eq('id', playerId);
+        const newGame = await createGame(session!.user.id, code);
 
         setGameId(newGame.id);
         setRoomCode(newGame.room_code);
 
         // Store for session
         sessionStorage.setItem('gameId', newGame.id);
-        sessionStorage.setItem('playerId', playerId);
       } catch (err) {
         console.error('Failed to create game:', err);
       } finally {
@@ -128,7 +92,6 @@ export default function HostPage() {
     <Lobby
       gameId={gameId}
       roomCode={roomCode}
-      hostId={hostId}
       onGameStart={handleGameStart}
     />
   );

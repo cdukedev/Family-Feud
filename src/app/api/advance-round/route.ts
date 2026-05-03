@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+function getServerPointMultiplier(roundNumber: number): number {
+  if (roundNumber <= 2) return 1;
+  if (roundNumber === 3) return 2;
+  return 3;
+}
+
 export async function POST(request: Request) {
   try {
     const {
@@ -203,13 +209,8 @@ export async function POST(request: Request) {
           .update({ times_used: picked.times_used + 1 })
           .eq('id', picked.id);
 
-        // Determine point multiplier (e.g., double/triple for later rounds)
-        let pointMultiplier = 1;
-        if (nextRoundNumber >= totalRounds) {
-          pointMultiplier = 3;
-        } else if (nextRoundNumber >= totalRounds - 1) {
-          pointMultiplier = 2;
-        }
+        // Determine point multiplier using absolute round numbers per TV rules
+        const pointMultiplier = getServerPointMultiplier(nextRoundNumber);
 
         const { data: newRoundData, error: newRoundError } = await supabase
           .from('rounds')

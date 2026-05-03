@@ -9,7 +9,7 @@ import { FastMoneyBoard } from './FastMoneyBoard';
 import { GameOverScreen } from './GameOverScreen';
 import { Logo } from '@/components/ui/Logo';
 import { useGameStore } from '@/stores/gameStore';
-import { useAudio } from '@/hooks/useAudio';
+import { useHostVoice } from '@/hooks/useHostVoice';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { createClient } from '@/lib/supabase/client';
 import { calculateRoundPoints } from '@/lib/game/scoring';
@@ -22,7 +22,7 @@ interface GameBoardProps {
 
 export function GameBoard({ gameId }: GameBoardProps) {
   const { game, currentRound, teams, players, teamMembers, answers, setAnswers } = useGameStore();
-  const { play } = useAudio();
+  const { speak, play } = useHostVoice();
   const [question, setQuestion] = useState<Question | null>(null);
   const [showStrike, setShowStrike] = useState(false);
   const [lastStrikeCount, setLastStrikeCount] = useState(0);
@@ -77,6 +77,55 @@ export function GameBoard({ gameId }: GameBoardProps) {
     }
     prevRevealedLenRef.current = newLen;
   }, [currentRound?.revealed, play]);
+
+  // Host reads question when round starts
+  const lastQuestionRef = useRef<string>('');
+  useEffect(() => {
+    if (!question || !currentRound || question.id === lastQuestionRef.current) return;
+    lastQuestionRef.current = question.id;
+
+    const faceOff = getFaceOffPlayers();
+    if (faceOff) {
+      speak('face_off_intro', {
+        player1_name: faceOff.player1.username,
+        player2_name: faceOff.player2.username,
+      });
+      // Read question after a delay
+      setTimeout(() => {
+        speak('read_question', {
+          question_text: question.text,
+          answer_count: answers.length,
+        });
+      }, 3000);
+    }
+  }, [question?.id]);
+
+  // Host reacts to correct answers
+  const lastRevealRef = useRef(0);
+  useEffect(() => {
+    if (!currentRound) return;
+    const newLen = currentRound.revealed.length;
+    if (newLen > lastRevealRef.current && newLen > 0) {
+      const lastRank = currentRound.revealed[currentRound.revealed.length - 1];
+      const answer = answers.find(a => a.rank === lastRank);
+      if (answer) {
+        speak('correct_answer', {
+          answer_text: answer.text,
+          rank: answer.rank,
+          points: answer.points * (currentRound.point_multiplier || 1),
+        });
+      }
+    }
+    lastRevealRef.current = newLen;
+  }, [currentRound?.revealed?.length]);
+
+  // Host reacts to strikes
+  const lastStrikeRef = useRef(0);
+  useEffect(() => {
+    if (!currentRound || currentRound.strikes <= lastStrikeRef.current) return;
+    speak('wrong_answer', { strikes: currentRound.strikes });
+    lastStrikeRef.current = currentRound.strikes;
+  }, [currentRound?.strikes]);
 
   const dismissStrike = useCallback(() => setShowStrike(false), []);
 

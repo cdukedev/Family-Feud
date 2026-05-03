@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Timer } from '@/components/ui/Timer';
 import { callApi } from '@/lib/api';
 import { motion } from 'framer-motion';
+import { MicButton } from './MicButton';
 
 interface AnswerScreenProps {
   roundId: string;
@@ -130,17 +131,16 @@ export function AnswerScreen({
         </Button>
       </div>
 
-      {/* Mic button placeholder — Phase 3 will add real STT */}
-      <div className="mt-8">
-        <Button
-          variant="mic"
-          size="xl"
-          disabled
-          className="!rounded-full !w-20 !h-20 opacity-30"
-        >
-          &#x1F3A4;
-        </Button>
-        <p className="text-white/20 text-xs text-center mt-2">Voice input coming soon</p>
+      {/* Mic button for voice input */}
+      <div className="mt-8 flex flex-col items-center">
+        <MicButton
+          onTranscript={(text) => {
+            setAnswer(text);
+            submitAnswer(text);
+          }}
+          disabled={submitted || submitting}
+        />
+        <p className="text-white/40 text-xs text-center mt-2">Hold to speak</p>
       </div>
     </div>
   );

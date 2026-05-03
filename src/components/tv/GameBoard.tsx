@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnswerTile } from './AnswerTile';
 import { StrikeOverlay } from './StrikeOverlay';
 import { Scoreboard } from './Scoreboard';
@@ -9,6 +9,7 @@ import { FastMoneyBoard } from './FastMoneyBoard';
 import { GameOverScreen } from './GameOverScreen';
 import { Logo } from '@/components/ui/Logo';
 import { useGameStore } from '@/stores/gameStore';
+import { useAudio } from '@/hooks/useAudio';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { createClient } from '@/lib/supabase/client';
 import { calculateRoundPoints } from '@/lib/game/scoring';
@@ -21,9 +22,11 @@ interface GameBoardProps {
 
 export function GameBoard({ gameId }: GameBoardProps) {
   const { game, currentRound, teams, players, teamMembers, answers, setAnswers } = useGameStore();
+  const { play } = useAudio();
   const [question, setQuestion] = useState<Question | null>(null);
   const [showStrike, setShowStrike] = useState(false);
   const [lastStrikeCount, setLastStrikeCount] = useState(0);
+  const prevRevealedLenRef = useRef(0);
   const { fetchFullState } = useRealtimeSync(gameId);
 
   // Fetch full state on mount
@@ -59,10 +62,21 @@ export function GameBoard({ gameId }: GameBoardProps) {
   // Show strike overlay when strikes increase
   useEffect(() => {
     if (currentRound && currentRound.strikes > lastStrikeCount) {
+      play('strike');
       setShowStrike(true);
       setLastStrikeCount(currentRound.strikes);
     }
-  }, [currentRound?.strikes, lastStrikeCount]);
+  }, [currentRound?.strikes, lastStrikeCount, play]);
+
+  // Play ding when a new answer is revealed
+  useEffect(() => {
+    if (!currentRound) return;
+    const newLen = currentRound.revealed.length;
+    if (newLen > prevRevealedLenRef.current) {
+      play('ding');
+    }
+    prevRevealedLenRef.current = newLen;
+  }, [currentRound?.revealed, play]);
 
   const dismissStrike = useCallback(() => setShowStrike(false), []);
 

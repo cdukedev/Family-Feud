@@ -161,6 +161,27 @@ export async function POST(request: Request) {
           .update({ phase: 'complete' })
           .eq('id', round_id);
 
+        // Fetch both teams' current scores (needed for 300-pt check and tie check)
+        const { data: allTeams } = await supabase
+          .from('teams')
+          .select('id, score, name')
+          .eq('game_id', round.game_id);
+
+        const maxScore = Math.max(...(allTeams || []).map((t) => t.score));
+
+        // 300-point threshold — game won immediately
+        if (maxScore >= 300) {
+          const winner = allTeams?.find((t) => t.score === maxScore);
+          await supabase.from('games').update({ status: 'fast_money' }).eq('id', round.game_id);
+          return NextResponse.json({
+            status: 'game_won',
+            winner_team: winner?.id,
+            winner_name: winner?.name,
+            points_awarded: totalPoints,
+            final_scores: allTeams,
+          });
+        }
+
         // Check if the game should finish
         const { data: gameData } = await supabase
           .from('games')
@@ -172,15 +193,69 @@ export async function POST(request: Request) {
         const totalRounds = gameSettings?.total_rounds ?? 4;
 
         if (round.round_number >= totalRounds) {
-          // Game is finished
-          await supabase
-            .from('games')
-            .update({ status: 'finished' })
-            .eq('id', round.game_id);
+          const scores = (allTeams || []).map((t) => t.score);
 
+          if (scores.length >= 2 && scores[0] === scores[1]) {
+            // SUDDEN DEATH — create triple-value round
+            const { data: sdQuestions } = await supabase
+              .from('questions')
+              .select('id, times_used')
+              .order('times_used', { ascending: true })
+              .order('id', { ascending: true })
+              .limit(20);
+
+            if (!sdQuestions || sdQuestions.length === 0) {
+              return NextResponse.json({ error: 'No questions available for sudden death' }, { status: 500 });
+            }
+
+            const sdMinUsed = sdQuestions[0].times_used;
+            const sdCandidates = sdQuestions.filter((q) => q.times_used === sdMinUsed);
+            const sdPicked = sdCandidates[Math.floor(Math.random() * sdCandidates.length)];
+
+            await supabase
+              .from('questions')
+              .update({ times_used: sdPicked.times_used + 1 })
+              .eq('id', sdPicked.id);
+
+            const sdRoundNumber = round.round_number + 1;
+
+            const { data: sdRoundData, error: sdRoundError } = await supabase
+              .from('rounds')
+              .insert({
+                game_id: round.game_id,
+                round_number: sdRoundNumber,
+                question_id: sdPicked.id,
+                phase: 'face_off',
+                point_multiplier: 3,
+              })
+              .select();
+
+            if (sdRoundError) {
+              return NextResponse.json({ error: sdRoundError.message }, { status: 500 });
+            }
+
+            await supabase
+              .from('games')
+              .update({ status: 'face_off', current_round: sdRoundNumber })
+              .eq('id', round.game_id);
+
+            return NextResponse.json({
+              status: 'sudden_death',
+              points_awarded: totalPoints,
+              round: sdRoundData?.[0],
+              final_scores: allTeams,
+            });
+          }
+
+          // Not tied — winner goes to fast money
+          const winner = allTeams?.reduce((a, b) => (a.score > b.score ? a : b));
+          await supabase.from('games').update({ status: 'fast_money' }).eq('id', round.game_id);
           return NextResponse.json({
-            status: 'game_finished',
+            status: 'game_won',
+            winner_team: winner?.id,
+            winner_name: winner?.name,
             points_awarded: totalPoints,
+            final_scores: allTeams,
           });
         }
 

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/stores/gameStore';
 import { Scoreboard } from './Scoreboard';
 import { Logo } from '@/components/ui/Logo';
+import { useAudio } from '@/hooks/useAudio';
+import { ConfettiOverlay } from './ConfettiOverlay';
 import type { Team } from '@/types/game';
 
 interface FastMoneyBoardProps {
@@ -14,8 +16,20 @@ interface FastMoneyBoardProps {
 
 export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
   const { fastMoney, players } = useGameStore();
+  const { play } = useAudio();
   const [revealIndex, setRevealIndex] = useState(-1);
   const [showTotal, setShowTotal] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const celebratedRef = useRef(false);
+
+  useEffect(() => {
+    if (fastMoney && fastMoney.combined_total >= 200 && !celebratedRef.current) {
+      celebratedRef.current = true;
+      play('confetti');
+      play('applause');
+      setShowConfetti(true);
+    }
+  }, [fastMoney?.combined_total, play]);
 
   const player1 = players.find((p) => p.id === fastMoney?.player1_id);
   const player2 = players.find((p) => p.id === fastMoney?.player2_id);
@@ -151,6 +165,8 @@ export function FastMoneyBoard({ gameId, teams }: FastMoneyBoardProps) {
       <div className="mt-6">
         <Scoreboard teams={teams} />
       </div>
+
+      <ConfettiOverlay active={showConfetti} />
     </div>
   );
 }

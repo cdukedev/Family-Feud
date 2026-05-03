@@ -145,6 +145,18 @@ export function GameBoard({ gameId }: GameBoardProps) {
     ? calculateRoundPoints(currentRound.revealed, answers, currentRound.round_number)
     : 0;
 
+  // Announce game over with winner
+  useEffect(() => {
+    if (game?.status === 'finished' && teams.length >= 2) {
+      const winner = [...teams].sort((a, b) => b.score - a.score)[0];
+      play('applause');
+      speak('game_over', {
+        winner_name: winner.name,
+        winner_score: winner.score,
+      });
+    }
+  }, [game?.status]);
+
   // Game over
   if (game?.status === 'finished') {
     return <GameOverScreen teams={teams} />;

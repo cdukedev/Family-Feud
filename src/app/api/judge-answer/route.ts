@@ -105,7 +105,27 @@ export async function POST(request: Request) {
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (GEMINI_API_KEY) {
         const unrevealed = answers.filter((a) => !revealed.includes(a.rank));
-        const answerTexts = unrevealed.map((a) => `"${a.text}"`).join(', ');
+
+        const geminiPrompt = `You are a Family Feud answer judge. Given a survey question, board answers, and a player's spoken answer, determine if it matches any board answer.
+
+Examples of matches:
+- "automobile" matches "Car" (synonym)
+- "sunblock" matches "Sunscreen" (same product)
+- "doggy" matches "Dog" (informal)
+- "TV" matches "Television" (abbreviation)
+- "french fries" matches "Fries" (common shortening)
+
+Examples of NON-matches:
+- "Ocean" does NOT match "Swimming Pool" (different things)
+- "House" does NOT match "Apartment" (related but distinct)
+
+Be generous — Family Feud accepts reasonable interpretations.
+
+Question: "${questionText}"
+Board answers: [${unrevealed.map(a => a.text).join(', ')}]
+Player said: "${raw_text}"
+
+Respond with ONLY the exact board answer text that matches, or "NO MATCH".`;
 
         const geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -118,7 +138,7 @@ export async function POST(request: Request) {
                   role: 'user',
                   parts: [
                     {
-                      text: `You are a Family Feud answer judge. Question: "${questionText}". Board answers: [${answerTexts}]. Player said: "${raw_text}". If the player's answer matches any board answer, respond with ONLY the exact board answer text. Otherwise respond with exactly "NO MATCH". Be generous - Family Feud accepts reasonable interpretations.`,
+                      text: geminiPrompt,
                     },
                   ],
                 },
